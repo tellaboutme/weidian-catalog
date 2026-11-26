@@ -16,6 +16,7 @@
   color-scheme:dark;
 }}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,"Segoe UI","Noto Sans CJK SC","Microsoft YaHei",sans-serif}
 header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);
   padding:10px max(16px,env(safe-area-inset-right)) 10px max(16px,env(safe-area-inset-left));display:flex;flex-direction:column;gap:8px}
@@ -51,7 +52,7 @@ a.card:hover{border-color:var(--acc)}
 #empty h2{margin:0;font-size:22px;text-wrap:balance}
 #empty p{margin:0;color:var(--mut)}
 #empty code{background:var(--card);border:1px solid var(--line);border-radius:5px;padding:2px 6px}
-#dropzone{position:fixed;inset:0;z-index:20;background:color-mix(in srgb,var(--drop) 92%,transparent);border:3px dashed var(--acc);
+#dropzone{position:fixed;inset:0;z-index:20;pointer-events:none;background:color-mix(in srgb,var(--drop) 92%,transparent);border:3px dashed var(--acc);
   display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600;color:var(--acc)}
 #toast{position:fixed;left:50%;bottom:max(16px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:30;background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:6px;max-width:calc(100% - 32px)}
 #urlrow{display:flex;gap:8px;width:100%;max-width:520px}
@@ -272,12 +273,16 @@ async function loadUrl(u) {
   } catch (e) { toast(`Не удалось загрузить ${u}: ${e.message}. Сайт с файлом должен разрешать CORS (raw.githubusercontent.com и gist разрешают).`); }
 }
 
-// drag & drop anywhere
-let dragN = 0;
-addEventListener("dragenter", e => { if (e.dataTransfer?.types.includes("Files")) { dragN++; $("dropzone").hidden = false; } });
-addEventListener("dragleave", () => { if (--dragN <= 0) { dragN = 0; $("dropzone").hidden = true; } });
-addEventListener("dragover", e => e.preventDefault());
-addEventListener("drop", e => { e.preventDefault(); dragN = 0; $("dropzone").hidden = true; addFiles([...e.dataTransfer.files]); });
+// drag & drop anywhere: overlay stays while dragover keeps firing, hides 150ms after it stops
+let dragT;
+const hideDrop = () => { clearTimeout(dragT); $("dropzone").hidden = true; };
+addEventListener("dragover", e => {
+  if (!e.dataTransfer?.types.includes("Files")) return;
+  e.preventDefault(); $("dropzone").hidden = false;
+  clearTimeout(dragT); dragT = setTimeout(hideDrop, 150);
+});
+addEventListener("drop", e => { e.preventDefault(); hideDrop(); if (e.dataTransfer?.files.length) addFiles([...e.dataTransfer.files]); });
+addEventListener("dragend", hideDrop);
 
 // infinite scroll
 new IntersectionObserver(es => { if (es[0].isIntersecting && $("more")) more(); }, { rootMargin: "900px" })
