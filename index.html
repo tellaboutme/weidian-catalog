@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Weidian Catalog</title>
+<style>
+/* layout: sticky toolbar, shop chips row, auto-fill product grid */
+:root{
+  --bg:#f5f4f1;--card:#fff;--fg:#1c1b19;--mut:#75716a;--line:#e2dfd8;--acc:#c2410c;--acc-fg:#fff;--drop:#fff4ec;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#131211;--card:#1d1c1a;--fg:#ece9e3;--mut:#9b968e;--line:#2f2d2a;--acc:#fb923c;--acc-fg:#1a0d04;--drop:#2a1c12;
+  color-scheme:dark;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,"Segoe UI","Noto Sans CJK SC","Microsoft YaHei",sans-serif}
+header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);
+  padding:10px max(16px,env(safe-area-inset-right)) 10px max(16px,env(safe-area-inset-left));display:flex;flex-direction:column;gap:8px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+h1{font-size:16px;margin:0 8px 0 0;white-space:nowrap;letter-spacing:.01em}
+h1 b{color:var(--acc)}
+input,select,button{font:inherit;color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:6px;padding:6px 9px}
+button{cursor:pointer}
+button.pri{background:var(--acc);border-color:var(--acc);color:var(--acc-fg);font-weight:600}
+input:focus-visible,select:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+#q{flex:1 1 220px;min-width:0}
+input[type=number]{width:84px}
+label.chk{display:flex;gap:5px;align-items:center;color:var(--mut);white-space:nowrap}
+#count{color:var(--mut);margin-left:auto;font-variant-numeric:tabular-nums}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 4px 3px 10px;border:1px solid var(--line);border-radius:999px;background:var(--card);font-size:12px;font-variant-numeric:tabular-nums}
+.chip.off{opacity:.45}
+.chip span{cursor:pointer}
+.chip a{color:var(--mut);text-decoration:none}
+.chip button{border:0;background:none;padding:0 6px;color:var(--mut);font-size:14px;line-height:1}
+main{padding:16px max(16px,env(safe-area-inset-right)) 32px max(16px,env(safe-area-inset-left))}
+#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:14px}
+a.card{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:8px;overflow:hidden;color:inherit;text-decoration:none}
+a.card:hover{border-color:var(--acc)}
+.img{aspect-ratio:1;background:var(--line)}
+.img img{width:100%;height:100%;object-fit:cover;display:block}
+.info{padding:8px 10px 10px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.price{font-weight:700;font-size:16px;color:var(--acc);font-variant-numeric:tabular-nums}
+.name{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;font-size:13px;overflow-wrap:anywhere}
+.meta{color:var(--mut);font-size:12px;display:flex;justify-content:space-between;gap:6px;font-variant-numeric:tabular-nums}
+#more{display:block;margin:20px auto 0;padding:10px 28px}
+#empty{max-width:560px;margin:8vh auto;text-align:center;display:flex;flex-direction:column;gap:14px;align-items:center}
+#empty h2{margin:0;font-size:22px;text-wrap:balance}
+#empty p{margin:0;color:var(--mut)}
+#empty code{background:var(--card);border:1px solid var(--line);border-radius:5px;padding:2px 6px}
+#dropzone{position:fixed;inset:0;z-index:20;background:color-mix(in srgb,var(--drop) 92%,transparent);border:3px dashed var(--acc);
+  display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600;color:var(--acc)}
+#toast{position:fixed;left:50%;bottom:max(16px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:30;background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:6px;max-width:calc(100% - 32px)}
+#urlrow{display:flex;gap:8px;width:100%;max-width:520px}
+#urlrow input{flex:1;min-width:0}
+@media (prefers-reduced-motion:no-preference){a.card{transition:border-color .12s}}
+</style>
+</head>
+<body>
+<header>
+  <div class="row">
+    <h1>微店 <b>Catalog</b></h1>
+    <input type="search" id="q" placeholder="Поиск по названию: 克罗心, 做旧, jeans…">
+    <select id="sort" aria-label="Сортировка">
+      <option value="sold">Больше продаж</option>
+      <option value="new">Новые</option>
+      <option value="pa">Цена ↑</option>
+      <option value="pd">Цена ↓</option>
+    </select>
+    <input type="number" id="min" placeholder="от ¥" min="0" aria-label="Цена от">
+    <input type="number" id="max" placeholder="до ¥" min="0" aria-label="Цена до">
+    <label class="chk"><input type="checkbox" id="hide1" checked> скрыть ≤ ¥5</label>
+    <button class="pri" id="add">+ CSV / JSON</button>
+    <input type="file" id="file" accept=".csv,.json,text/csv,application/json" multiple hidden>
+    <span id="count"></span>
+  </div>
+  <div class="chips" id="chips"></div>
+</header>
+<main>
+  <section id="empty" hidden>
+    <h2>Загрузите выгрузку магазина</h2>
+    <p>Перетащите сюда файлы <code>weidian_&lt;id&gt;.csv</code> или <code>.json</code>, которые делает команда <code>weidian &lt;id&gt;</code>. Файлы остаются только в вашем браузере.</p>
+    <button class="pri" id="add2">Выбрать файлы</button>
+    <p>или откройте файл по ссылке (raw GitHub, Gist и т.п.):</p>
+    <form id="urlrow"><input type="url" id="url" placeholder="https://…/weidian_1350023534.csv" aria-label="Ссылка на CSV или JSON"><button type="submit">Открыть</button></form>
+  </section>
+  <div id="grid"></div>
+</main>
+<div id="dropzone" hidden>Отпустите, чтобы добавить</div>
+<div id="toast" hidden></div>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const PAGE = 240;
+let shops = {};      // shopId -> {items:[...], on:true}
+let list = [], shown = 0;
+
+// ---------- storage (IndexedDB, best effort) ----------
+const DB = {
+  db: null,
+  open() {
+    return new Promise(res => {
+      try {
+        const r = indexedDB.open("weidian-catalog", 1);
+        r.onupgradeneeded = () => r.result.createObjectStore("shops");
+        r.onsuccess = () => { this.db = r.result; res(); };
+        r.onerror = () => res();
+      } catch { res(); }
+    });
+  },
+  tx(mode, fn) {
+    return new Promise(res => {
+      if (!this.db) return res(null);
+      try {
+        const t = this.db.transaction("shops", mode), s = t.objectStore("shops"), out = fn(s);
+        t.oncomplete = () => res(out && out.result); t.onerror = () => res(null);
+      } catch { res(null); }
+    });
+  },
+  all() { return new Promise(res => {
+    if (!this.db) return res([]);
+    try {
+      const out = [], c = this.db.transaction("shops").objectStore("shops").openCursor();
+      c.onsuccess = () => { const cur = c.result; if (cur) { out.push(cur.value); cur.continue(); } else res(out); };
+      c.onerror = () => res([]);
+    } catch { res([]); }
+  }); },
+  put(v) { return this.tx("readwrite", s => s.put(v, v.id)); },
+  del(id) { return this.tx("readwrite", s => s.delete(id)); },
+};
+
+// ---------- parsing ----------
+function parseCSV(text) {
+  text = text.replace(/^﻿/, "");
+  const rows = []; let row = [], f = "", q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; }
+      else f += c;
+    } else if (c === '"') q = true;
+    else if (c === ",") { row.push(f); f = ""; }
+    else if (c === "\n" || c === "\r") {
+      if (c === "\r" && text[i + 1] === "\n") i++;
+      row.push(f); rows.push(row); row = []; f = "";
+    } else f += c;
+  }
+  if (f || row.length) { row.push(f); rows.push(row); }
+  const head = rows.shift() || [];
+  return rows.filter(r => r.length > 1).map(r => Object.fromEntries(head.map((h, i) => [h.trim(), r[i] ?? ""])));
+}
+const pick = (o, ...k) => { for (const x of k) if (o[x] !== undefined && o[x] !== null && o[x] !== "") return o[x]; return ""; };
+function normalize(o) {
+  const id = String(pick(o, "productId", "itemId", "id"));
+  let price = parseFloat(pick(o, "price_cny", "price"));
+  // Apify "weidian-products" output: productId + price in fen (cents)
+  if (!("price_cny" in o) && "productId" in o && "price" in o) price /= 100;
+  return {
+    id, shop: String(pick(o, "shopId", "userid", "sellerId") || "unknown"),
+    date: String(pick(o, "createdAt", "date")).slice(0, 10),
+    name: String(pick(o, "name", "itemName", "title")),
+    price: isFinite(price) ? price : 0,
+    sold: parseInt(pick(o, "sold", "sales")) || 0,
+    img: String(pick(o, "thumbnail", "itemImg", "image")),
+    url: String(pick(o, "url", "itemUrl")) || `https://weidian.com/item.html?itemID=${id}`,
+  };
+}
+function parseFile(name, text) {
+  let raw;
+  const t = text.trim();
+  if (/\.json$/i.test(name) || t.startsWith("[") || t.startsWith("{")) {
+    raw = JSON.parse(t);
+    if (!Array.isArray(raw)) raw = raw.items || raw.itemList || raw.data || [];
+  } else raw = parseCSV(text);
+  return raw.map(normalize).filter(r => r.id && r.name);
+}
+
+async function ingest(name, text) {
+  let items;
+  try { items = parseFile(name, text); }
+  catch (e) { toast(`${name}: не получилось прочитать файл (${e.message})`); return 0; }
+  if (!items.length) { toast(`${name}: в файле нет товаров`); return 0; }
+  const by = {};
+  for (const it of items) (by[it.shop] ||= []).push(it);
+  for (const [id, arr] of Object.entries(by)) {
+    shops[id] = { id, items: arr, on: true, added: new Date().toISOString().slice(0, 10) };
+    await DB.put({ id, items: arr, added: shops[id].added });
+  }
+  return items.length;
+}
+async function addFiles(files) {
+  let n = 0;
+  for (const f of files) n += await ingest(f.name, await f.text());
+  if (n) { toast(`Добавлено товаров: ${n}`); render(); }
+}
+
+// ---------- UI ----------
+let toastT;
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3500); }
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const thumb = u => !u ? "" : /geilicdn\.com/.test(u) && !u.includes("?") ? u + "?w=400&h=400&cp=1" : u;
+function card(r) {
+  const p = r.price % 1 ? r.price.toFixed(2) : r.price;
+  return `<a class="card" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">
+<div class="img">${r.img ? `<img loading="lazy" referrerpolicy="no-referrer" src="${esc(thumb(r.img))}" alt="">` : ""}</div>
+<div class="info"><div class="price">¥${p}</div><div class="name" title="${esc(r.name)}">${esc(r.name)}</div>
+<div class="meta"><span>продано ${r.sold}</span><span>${esc(r.date)}</span></div></div></a>`;
+}
+function more() {
+  $("more")?.remove();
+  $("grid").insertAdjacentHTML("beforeend", list.slice(shown, shown + PAGE).map(card).join(""));
+  shown = Math.min(shown + PAGE, list.length);
+  if (shown < list.length) {
+    $("grid").insertAdjacentHTML("afterend", `<button id="more">Ещё ${list.length - shown}</button>`);
+    $("more").onclick = more;
+  }
+}
+function renderChips() {
+  $("chips").innerHTML = Object.values(shops).map(s =>
+    `<span class="chip${s.on ? "" : " off"}" data-id="${esc(s.id)}">
+<span title="Показать или скрыть" data-act="toggle">${esc(s.id)} · ${s.items.length}</span>
+<a href="https://weidian.com/?userid=${encodeURIComponent(s.id)}" target="_blank" rel="noopener noreferrer" title="Открыть магазин">↗</a>
+<button data-act="del" title="Удалить из каталога" aria-label="Удалить ${esc(s.id)}">×</button></span>`).join("");
+}
+function render() {
+  const has = Object.keys(shops).length > 0;
+  $("empty").hidden = has;
+  renderChips();
+  const q = $("q").value.trim().toLowerCase(), mn = +$("min").value || 0, mx = +$("max").value || Infinity,
+        h = $("hide1").checked, s = $("sort").value;
+  list = [];
+  for (const sh of Object.values(shops)) if (sh.on)
+    for (const r of sh.items)
+      if (r.price >= mn && r.price <= mx && (!h || r.price > 5) && (!q || r.name.toLowerCase().includes(q))) list.push(r);
+  const cmp = { sold: (a, b) => b.sold - a.sold, new: (a, b) => b.date.localeCompare(a.date),
+                pa: (a, b) => a.price - b.price, pd: (a, b) => b.price - a.price }[s];
+  list.sort(cmp);
+  const total = Object.values(shops).reduce((a, s) => a + s.items.length, 0);
+  $("count").textContent = has ? `${list.length} из ${total}` : "";
+  $("grid").innerHTML = ""; shown = 0; more();
+  try { localStorage.setItem("wc-ui", JSON.stringify({ s, h, off: Object.values(shops).filter(x => !x.on).map(x => x.id) })); } catch {}
+}
+
+$("chips").addEventListener("click", async e => {
+  const chip = e.target.closest(".chip"), act = e.target.dataset.act;
+  if (!chip || !act) return;
+  const id = chip.dataset.id;
+  if (act === "toggle") shops[id].on = !shops[id].on;
+  if (act === "del") {
+    if (chip.dataset.confirm !== "1") { chip.dataset.confirm = "1"; e.target.textContent = "удалить?"; return; }
+    delete shops[id]; await DB.del(id); toast(`Магазин ${id} удалён`);
+  }
+  render();
+});
+let deb;
+for (const id of ["q", "min", "max"]) $(id).addEventListener("input", () => { clearTimeout(deb); deb = setTimeout(render, 180); });
+for (const id of ["sort", "hide1"]) $(id).addEventListener("change", render);
+for (const id of ["add", "add2"]) $(id).onclick = () => $("file").click();
+$("file").onchange = e => { addFiles([...e.target.files]); e.target.value = ""; };
+$("urlrow").addEventListener("submit", e => { e.preventDefault(); loadUrl($("url").value.trim()); });
+
+async function loadUrl(u) {
+  if (!u) return;
+  try {
+    const r = await fetch(u);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const n = await ingest(u.split("/").pop().split("?")[0], await r.text());
+    if (n) { toast(`Добавлено товаров: ${n}`); render(); }
+  } catch (e) { toast(`Не удалось загрузить ${u}: ${e.message}. Сайт с файлом должен разрешать CORS (raw.githubusercontent.com и gist разрешают).`); }
+}
+
+// drag & drop anywhere
+let dragN = 0;
+addEventListener("dragenter", e => { if (e.dataTransfer?.types.includes("Files")) { dragN++; $("dropzone").hidden = false; } });
+addEventListener("dragleave", () => { if (--dragN <= 0) { dragN = 0; $("dropzone").hidden = true; } });
+addEventListener("dragover", e => e.preventDefault());
+addEventListener("drop", e => { e.preventDefault(); dragN = 0; $("dropzone").hidden = true; addFiles([...e.dataTransfer.files]); });
+
+// infinite scroll
+new IntersectionObserver(es => { if (es[0].isIntersecting && $("more")) more(); }, { rootMargin: "900px" })
+  .observe(document.body.appendChild(document.createElement("div")));
+
+// boot: restore saved shops, then ?data=<url>[,<url>] for shareable links
+(async () => {
+  let ui = {};
+  try { ui = JSON.parse(localStorage.getItem("wc-ui") || "{}"); } catch {}
+  if (ui.s) $("sort").value = ui.s;
+  if (typeof ui.h === "boolean") $("hide1").checked = ui.h;
+  await DB.open();
+  for (const v of await DB.all()) shops[v.id] = { ...v, on: !(ui.off || []).includes(v.id) };
+  render();
+  const p = new URLSearchParams(location.search).get("data");
+  if (p) for (const u of p.split(",")) await loadUrl(u);
+})();
+</script>
+</body>
+</html>
